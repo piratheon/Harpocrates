@@ -1,0 +1,18 @@
+{
+  "name": "Harpocrates",
+  "short_name": "Harpocrates",
+  "description": "Encrypt and hide files inside images securely in your browser.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FEF7FF",
+  "theme_color": "#6750A4",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
