@@ -3,9 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security: Content Security Policy to prevent XSS -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self';">
+    
     <title>Harpocrates - Hide Files in Images</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' clip-rule='evenodd' d='M4 0C1.79086 0 0 1.79086 0 4V28C0 30.2091 1.79086 32 4 32H28C30.2091 32 32 30.2091 32 28V4C32 1.79086 30.2091 0 28 0H4Z' fill='%236750A4'/%3E%3Cpath d='M9 8V24' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M23 8V24' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M9 16H14' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 16H23' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath fill-rule='evenodd' clip-rule='evenodd' d='M16 19C17.1046 19 18 18.1046 18 17V15C18 13.8954 17.1046 13 16 13C14.8954 13 14 13.8954 14 15V17C14 18.1046 14.8954 19 16 19Z' fill='white'/%3E%3C/svg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -141,11 +145,12 @@
         .material-button {
             background-color: var(--color-primary);
             color: var(--color-on-primary);
-            transition: background-color 0.3s, box-shadow 0.2s;
+            transition: background-color 0.3s, box-shadow 0.2s, opacity 0.3s;
             box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06);
         }
-        .material-button:hover {
+        .material-button:hover:not(:disabled) {
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            filter: brightness(1.1);
         }
         .material-button:disabled {
             background-color: var(--color-on-surface-variant);
@@ -157,10 +162,11 @@
         .file-input-label {
             border: 2px dashed var(--color-outline);
             color: var(--color-on-surface-variant);
-            transition: border-color 0.3s, color 0.3s;
+            transition: all 0.3s;
         }
-        .file-input-label:hover {
+        .file-input-label:hover, .file-input-label.drag-active {
             border-color: var(--color-primary);
+            background-color: var(--color-surface-container-highest);
             color: var(--color-primary);
         }
         
@@ -185,6 +191,61 @@
         .floating-nav-item:active .icon {
             transform: scale(0.9);
         }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-left-color: var(--color-on-primary);
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            bottom: 6rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .toast {
+            padding: 0.75rem 1.5rem;
+            border-radius: 2rem;
+            background-color: var(--color-inverse-surface);
+            color: var(--color-inverse-on-surface);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            font-size: 0.875rem;
+            opacity: 0;
+            transform: translateY(1rem);
+            animation: toast-in 0.3s forwards;
+            background: #322F35; /* Dark surface fallback */
+            color: #F4EFF4;
+        }
+        html.dark .toast {
+            background: #E6E1E5;
+            color: #313033;
+        }
+        .toast.error {
+            background-color: var(--color-error);
+            color: white;
+        }
+        @keyframes toast-in {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toast-out {
+            to { opacity: 0; transform: translateY(1rem); }
+        }
+
         /* About Modal Styles */
         .about-modal-overlay {
             position: fixed;
@@ -193,6 +254,7 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -208,25 +270,28 @@
         .about-modal {
             background-color: var(--color-surface-container-highest);
             padding: 2rem;
-            border-radius: 1rem;
+            border-radius: 1.5rem;
             max-width: 500px;
             width: 90%;
             text-align: center;
             transform: scale(0.95);
-            transition: transform 0.3s;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .about-modal-overlay.visible .about-modal {
             transform: scale(1);
         }
     </style>
 </head>
-<body class="antialiased">
+<body class="antialiased selection:bg-purple-200 selection:text-purple-900">
 
     <div class="min-h-screen flex flex-col items-center justify-center p-4">
         <main class="w-full max-w-5xl mx-auto pb-32">
-            <header class="text-center mb-8">
-                <h1 class="text-4xl md:text-5xl font-bold" style="color: var(--color-primary);">Harpocrates</h1>
-                <p class="text-lg mt-2" style="color: var(--color-on-surface-variant);">Encrypt and hide files inside images, securely in your browser.</p>
+            <header class="text-center mb-10">
+                <div class="inline-block p-3 rounded-full mb-4 bg-purple-100 dark:bg-purple-900/30">
+                     <svg width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M4 0C1.79086 0 0 1.79086 0 4V28C0 30.2091 1.79086 32 4 32H28C30.2091 32 32 30.2091 32 28V4C32 1.79086 30.2091 0 28 0H4Z" fill="var(--color-primary)"/><path d="M9 8V24" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M23 8V24" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 16H14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 16H23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M16 19C17.1046 19 18 18.1046 18 17V15C18 13.8954 17.1046 13 16 13C14.8954 13 14 13.8954 14 15V17C14 18.1046 14.8954 19 16 19Z" fill="white"/></svg>
+                </div>
+                <h1 class="text-4xl md:text-5xl font-bold tracking-tight" style="color: var(--color-primary);">Harpocrates</h1>
+                <p class="text-lg mt-3 font-medium opacity-80" style="color: var(--color-on-surface-variant);">Encrypt and hide files inside images</p>
             </header>
 
             <!-- App Content -->
@@ -236,49 +301,73 @@
                     <div class="grid md:grid-cols-2 gap-8">
                         <!-- Left Column: Inputs -->
                         <div class="space-y-6">
-                            <div class="material-card p-6 flex flex-col items-center justify-center">
-                                <h3 class="text-xl font-semibold mb-4 w-full" style="color: var(--color-on-primary-container);">1. Carrier Image</h3>
-                                <label for="encode-image-input" class="file-input-label w-full h-32 flex flex-col items-center justify-center rounded-lg cursor-pointer">
-                                    <img id="encode-image-preview" class="hidden h-full w-full object-contain rounded-lg" />
-                                    <div id="encode-image-placeholder" class="text-center">
-                                        <svg class="mx-auto h-10 w-10" style="color: var(--color-on-surface-variant);" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" /></svg>
-                                        <p class="mt-2 text-sm">Click to upload PNG or JPG</p>
+                            <!-- Image Input -->
+                            <div class="material-card p-6 flex flex-col items-center justify-center relative group">
+                                <h3 class="text-xl font-semibold mb-4 w-full flex justify-between items-center" style="color: var(--color-on-primary-container);">
+                                    <span>1. Carrier Image</span>
+                                    <button id="clear-encode-image" class="hidden text-xs px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 hover:opacity-80">Clear</button>
+                                </h3>
+                                <label for="encode-image-input" class="file-input-label w-full h-40 flex flex-col items-center justify-center rounded-xl cursor-pointer relative overflow-hidden">
+                                    <img id="encode-image-preview" class="hidden h-full w-full object-contain z-10" />
+                                    <div id="encode-image-placeholder" class="text-center p-4">
+                                        <svg class="mx-auto h-10 w-10 mb-2 transition-transform group-hover:scale-110" style="color: var(--color-on-surface-variant);" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" /></svg>
+                                        <p class="text-sm font-medium">Drop Image or Click</p>
+                                        <p class="text-xs opacity-70 mt-1">PNG, JPG</p>
                                     </div>
                                 </label>
-                                <p id="encode-image-name" class="text-xs mt-2 truncate max-w-full px-2"></p>
-                                <input id="encode-image-input" type="file" class="hidden" accept="image/png, image/jpeg">
+                                <p id="encode-image-name" class="text-xs mt-2 truncate max-w-full px-2 opacity-80 font-mono"></p>
+                                <input id="encode-image-input" type="file" class="hidden" accept="image/png, image/jpeg, image/jpg">
                             </div>
 
-                             <div class="material-card p-6 flex flex-col items-center justify-center">
-                                <h3 class="text-xl font-semibold mb-4 w-full" style="color: var(--color-on-primary-container);">2. Secret File</h3>
-                                <label for="encode-file-input" class="file-input-label w-full h-32 flex flex-col items-center justify-center rounded-lg cursor-pointer">
-                                    <div id="encode-file-placeholder" class="text-center">
-                                        <svg class="mx-auto h-10 w-10" style="color: var(--color-on-surface-variant);" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>
-                                        <p class="mt-2 text-sm">Click to upload any file</p>
+                            <!-- File Input -->
+                             <div class="material-card p-6 flex flex-col items-center justify-center relative group">
+                                <h3 class="text-xl font-semibold mb-4 w-full flex justify-between items-center" style="color: var(--color-on-primary-container);">
+                                    <span>2. Secret File</span>
+                                    <button id="clear-encode-file" class="hidden text-xs px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 hover:opacity-80">Clear</button>
+                                </h3>
+                                <label for="encode-file-input" class="file-input-label w-full h-32 flex flex-col items-center justify-center rounded-xl cursor-pointer">
+                                    <div id="encode-file-placeholder" class="text-center p-4">
+                                        <svg class="mx-auto h-10 w-10 mb-2 transition-transform group-hover:scale-110" style="color: var(--color-on-surface-variant);" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c .621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                                        <p class="text-sm font-medium">Drop File or Click</p>
+                                        <p class="text-xs opacity-70 mt-1">Any file type</p>
                                     </div>
                                 </label>
-                                <p id="encode-file-name" class="text-xs mt-2 truncate max-w-full px-2"></p>
+                                <p id="encode-file-name" class="text-xs mt-2 truncate max-w-full px-2 opacity-80 font-mono"></p>
                                 <input id="encode-file-input" type="file" class="hidden">
                             </div>
                         </div>
                         <!-- Right Column: Password -->
                         <div class="material-card p-6 flex flex-col justify-start">
-                            <h3 class="text-xl font-semibold mb-4" style="color: var(--color-on-primary-container);">3. Set a Password</h3>
+                            <h3 class="text-xl font-semibold mb-4" style="color: var(--color-on-primary-container);">3. Encryption</h3>
                             <div class="space-y-6">
                                 <div class="form-field">
-                                    <input type="password" id="encode-password" class="form-input" placeholder=" ">
-                                    <label for="encode-password" class="form-label">Password</label>
+                                    <input type="password" id="encode-password" class="form-input pr-10" placeholder=" ">
+                                    <label for="encode-password" class="form-label">Set Password</label>
+                                    <button class="toggle-password absolute right-3 top-1/2 -translate-y-1/2 p-1 opacity-50 hover:opacity-100 transition-opacity" data-target="encode-password">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    </button>
                                 </div>
                                 <div class="form-field">
-                                    <input type="password" id="encode-password-confirm" class="form-input" placeholder=" ">
+                                    <input type="password" id="encode-password-confirm" class="form-input pr-10" placeholder=" ">
                                     <label for="encode-password-confirm" class="form-label">Confirm Password</label>
+                                    <button class="toggle-password absolute right-3 top-1/2 -translate-y-1/2 p-1 opacity-50 hover:opacity-100 transition-opacity" data-target="encode-password-confirm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    </button>
                                 </div>
+                                <p class="text-xs opacity-70 leading-relaxed pl-2 border-l-2 border-purple-300 dark:border-purple-700">
+                                    <strong class="block mb-1">Security Note:</strong>
+                                    Files are encrypted with AES-GCM (256-bit) in your browser. No data is sent to any server. If you lose the password, the data is unrecoverable.
+                                </p>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-8 text-center">
-                        <button id="encode-button" class="material-button text-lg font-semibold py-3 px-8 rounded-full disabled:opacity-50" disabled>
-                            Encrypt & Hide File
+                    <div class="mt-8 text-center flex flex-col md:flex-row gap-4 justify-center items-center">
+                        <button id="reset-encode" class="px-6 py-2 rounded-full text-sm font-medium opacity-60 hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 transition-all">
+                            Reset Form
+                        </button>
+                        <button id="encode-button" class="material-button text-lg font-semibold py-3 px-10 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transform transition active:scale-95" disabled>
+                            <span class="btn-text">Encrypt & Hide File</span>
+                            <span class="btn-loader hidden"><span class="spinner"></span>Processing...</span>
                         </button>
                     </div>
                 </div>
@@ -286,59 +375,73 @@
                 <!-- Decode View -->
                 <div id="view-decode" class="hidden">
                     <div class="max-w-2xl mx-auto">
-                         <div class="material-card p-6 space-y-8">
+                         <div class="material-card p-6 space-y-8 relative">
                              <div>
-                                <h3 class="text-xl font-semibold text-center" style="color: var(--color-on-primary-container);">1. Choose Image</h3>
-                                <label for="decode-image-input" class="file-input-label mt-4 w-full h-48 flex flex-col items-center justify-center rounded-lg cursor-pointer">
-                                    <img id="decode-image-preview" class="hidden h-full w-full object-contain rounded-lg" />
-                                    <div id="decode-image-placeholder" class="text-center">
-                                        <svg class="mx-auto h-12 w-12" style="color: var(--color-on-surface-variant);" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" /></svg>
-                                        <p class="mt-2 text-sm">Click to upload the encoded image</p>
+                                <h3 class="text-xl font-semibold text-center mb-4 flex justify-center items-center gap-2" style="color: var(--color-on-primary-container);">
+                                    1. Choose Encoded Image
+                                    <button id="clear-decode-image" class="hidden text-xs px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 hover:opacity-80">Clear</button>
+                                </h3>
+                                <label for="decode-image-input" class="file-input-label mt-4 w-full h-48 flex flex-col items-center justify-center rounded-xl cursor-pointer overflow-hidden relative">
+                                    <img id="decode-image-preview" class="hidden h-full w-full object-contain z-10" />
+                                    <div id="decode-image-placeholder" class="text-center p-4">
+                                        <svg class="mx-auto h-12 w-12 mb-3" style="color: var(--color-on-surface-variant);" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" /></svg>
+                                        <p class="mt-2 text-sm font-medium">Drop Encrypted Image Here</p>
                                     </div>
                                 </label>
-                                <p id="decode-image-name" class="text-xs mt-2 text-center truncate max-w-full px-2"></p>
-                                <input id="decode-image-input" type="file" class="hidden" accept="image/png, image/jpeg">
+                                <p id="decode-image-name" class="text-xs mt-2 text-center truncate max-w-full px-2 font-mono opacity-80"></p>
+                                <input id="decode-image-input" type="file" class="hidden" accept="image/png, image/jpeg, image/jpg">
                             </div>
                             <div>
-                                <h3 class="text-xl font-semibold text-center" style="color: var(--color-on-primary-container);">2. Enter Password</h3>
-                                 <div class="mt-4 form-field">
-                                    <input type="password" id="decode-password" class="form-input" placeholder=" ">
+                                <h3 class="text-xl font-semibold text-center mb-4" style="color: var(--color-on-primary-container);">2. Enter Password</h3>
+                                 <div class="mt-4 form-field max-w-md mx-auto">
+                                    <input type="password" id="decode-password" class="form-input pr-10" placeholder=" ">
                                     <label for="decode-password" class="form-label">Password</label>
+                                    <button class="toggle-password absolute right-3 top-1/2 -translate-y-1/2 p-1 opacity-50 hover:opacity-100 transition-opacity" data-target="decode-password">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-8 text-center">
-                            <button id="decode-button" class="material-button text-lg font-semibold py-3 px-8 rounded-full disabled:opacity-50" disabled>
-                                Decrypt & Reveal File
+                        <div class="mt-8 text-center flex flex-col md:flex-row gap-4 justify-center items-center">
+                            <button id="reset-decode" class="px-6 py-2 rounded-full text-sm font-medium opacity-60 hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 transition-all">
+                                Reset Form
+                            </button>
+                            <button id="decode-button" class="material-button text-lg font-semibold py-3 px-10 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transform transition active:scale-95" disabled>
+                                <span class="btn-text">Decrypt & Reveal File</span>
+                                <span class="btn-loader hidden"><span class="spinner"></span>Decrypting...</span>
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Status/Result Area -->
-            <div id="status-area" class="mt-8 text-center min-h-[6rem] flex items-center justify-center"></div>
+            <!-- Download Area -->
+            <div id="status-area" class="mt-8 text-center min-h-[6rem] flex items-center justify-center transition-all duration-500 opacity-0 translate-y-4"></div>
         </main>
     </div>
 
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
     <!-- Floating Navigation -->
-    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 rounded-3xl shadow-lg" style="background-color: var(--color-surface-container-high);">
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 rounded-full shadow-xl border border-white/10 backdrop-blur-md" style="background-color: var(--color-surface-container-high);">
         <div id="mode-switcher" class="flex items-center gap-1 p-1 rounded-full" style="background-color: var(--color-surface-container);">
             <button id="switch-encode" class="floating-nav-item">
-                <svg class="icon h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                <span class="text-xs font-medium">Encode</span>
+                <svg class="icon h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Encode</span>
             </button>
             <button id="switch-decode" class="floating-nav-item">
-                <svg class="icon h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                <span class="text-xs font-medium">Decode</span>
+                <svg class="icon h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                <span class="text-[10px] font-bold uppercase tracking-wider">Decode</span>
             </button>
         </div>
-        <button id="theme-toggle" class="p-3 rounded-full" style="color: var(--color-on-surface-variant); background-color: var(--color-surface-container);">
-            <svg id="theme-icon-light" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
-            <svg id="theme-icon-dark" class="h-6 w-6 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
+        <div class="h-8 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+        <button id="theme-toggle" class="p-3 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="Toggle Theme">
+            <svg id="theme-icon-light" class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
+            <svg id="theme-icon-dark" class="h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
         </button>
-        <button id="about-button" class="p-3 rounded-full" style="color: var(--color-on-surface-variant); background-color: var(--color-surface-container);">
-            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <button id="about-button" class="p-3 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="About">
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
             </svg>
         </button>
@@ -346,26 +449,38 @@
 
     <!-- About Modal -->
     <div id="about-modal" class="about-modal-overlay">
-        <div class="about-modal">
-            <h2 class="text-2xl font-bold mb-4" style="color: var(--color-primary);">About & Support</h2>
-            <p class="mb-4" style="color: var(--color-on-surface-variant);">If you find Harpocrates useful, please consider supporting the developer. Your contribution helps maintain and improve the project!</p>
-            <div class="mb-4">
-                <p class="font-semibold" style="color: var(--color-on-primary-container);">TON Wallet Address:</p>
-                <div class="mt-2 flex items-center gap-2 p-2 rounded-lg" style="background-color: var(--color-surface-container);">
-                    <p id="ton-address" class="text-sm break-all flex-grow text-left" style="color: var(--color-on-surface-variant);">UQAbjx-d8UQ_FxEgONFB3Y412f4fW7e-zOdBXmMSs59pkYog</p>
-                    <button id="copy-ton-address" title="Copy Address" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <div class="about-modal shadow-2xl">
+            <div class="mb-4 flex justify-center">
+                 <svg width="64" height="64" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M4 0C1.79086 0 0 1.79086 0 4V28C0 30.2091 1.79086 32 4 32H28C30.2091 32 32 30.2091 32 28V4C32 1.79086 30.2091 0 28 0H4Z" fill="var(--color-primary)"/><path d="M9 8V24" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M23 8V24" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 16H14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 16H23" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M16 19C17.1046 19 18 18.1046 18 17V15C18 13.8954 17.1046 13 16 13C14.8954 13 14 13.8954 14 15V17C14 18.1046 14.8954 19 16 19Z" fill="white"/></svg>
+            </div>
+            <h2 class="text-2xl font-bold mb-2" style="color: var(--color-primary);">About Harpocrates</h2>
+            <p class="text-sm opacity-70 mb-6">v2.0 - Secure Client-Side Steganography</p>
+            
+            <p class="mb-6 text-sm leading-relaxed" style="color: var(--color-on-surface-variant);">
+                Harpocrates allows you to securely hide files inside images directly in your browser. 
+                <br><strong>Privacy First:</strong> No data leaves your device. All encryption happens locally.
+            </p>
+
+            <div class="mb-6 text-left p-4 rounded-xl bg-gray-50 dark:bg-gray-800">
+                <p class="font-bold text-xs uppercase tracking-wider mb-2 opacity-60">Donate (TON)</p>
+                <div class="flex items-center gap-2">
+                    <p id="ton-address" class="text-xs font-mono break-all flex-grow">UQAbjx-d8UQ_FxEgONFB3Y412f4fW7e-zOdBXmMSs59pkYog</p>
+                    <button id="copy-ton-address" title="Copy Address" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
                         </svg>
                     </button>
                 </div>
-                 <p id="copy-feedback" class="text-xs text-left mt-1 h-4" style="color: var(--color-primary);"></p>
             </div>
+            
             <div class="mb-6">
-                <p class="font-semibold" style="color: var(--color-on-primary-container);">Project GitHub Repo:</p>
-                <a href="https://github.com/piratheon/Harpocrates" target="_blank" rel="noopener noreferrer" class="text-sm" style="color: var(--color-primary);">https://github.com/piratheon/Harpocrates</a>
+                <a href="https://github.com/piratheon/Harpocrates" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-sm font-medium hover:underline" style="color: var(--color-primary);">
+                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    View on GitHub
+                </a>
             </div>
-            <button id="close-about-modal" class="material-button py-2 px-6 rounded-full font-medium">Close</button>
+            
+            <button id="close-about-modal" class="material-button py-2 px-8 rounded-full font-medium">Close</button>
         </div>
     </div>
 
@@ -382,22 +497,30 @@
             const encodeImagePreview = document.getElementById('encode-image-preview');
             const encodeImagePlaceholder = document.getElementById('encode-image-placeholder');
             const encodeImageName = document.getElementById('encode-image-name');
+            const clearEncodeImageBtn = document.getElementById('clear-encode-image');
             
             const encodeFileInput = document.getElementById('encode-file-input');
             const encodeFilePlaceholder = document.getElementById('encode-file-placeholder');
             const encodeFileName = document.getElementById('encode-file-name');
+            const clearEncodeFileBtn = document.getElementById('clear-encode-file');
+
             const encodePassword = document.getElementById('encode-password');
             const encodePasswordConfirm = document.getElementById('encode-password-confirm');
             const encodeButton = document.getElementById('encode-button');
+            const resetEncodeBtn = document.getElementById('reset-encode');
 
             const decodeImageInput = document.getElementById('decode-image-input');
             const decodeImagePreview = document.getElementById('decode-image-preview');
             const decodeImagePlaceholder = document.getElementById('decode-image-placeholder');
             const decodeImageName = document.getElementById('decode-image-name');
+            const clearDecodeImageBtn = document.getElementById('clear-decode-image');
+
             const decodePassword = document.getElementById('decode-password');
             const decodeButton = document.getElementById('decode-button');
+            const resetDecodeBtn = document.getElementById('reset-decode');
             
             const statusArea = document.getElementById('status-area');
+            const toastContainer = document.getElementById('toast-container');
             
             const themeToggleBtn = document.getElementById('theme-toggle');
             const themeIconLight = document.getElementById('theme-icon-light');
@@ -407,7 +530,20 @@
             const closeAboutModalButton = document.getElementById('close-about-modal');
             const copyTonAddressBtn = document.getElementById('copy-ton-address');
             const tonAddressElement = document.getElementById('ton-address');
-            const copyFeedback = document.getElementById('copy-feedback');
+            
+            // Password Toggles
+            document.querySelectorAll('.toggle-password').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.getAttribute('data-target');
+                    const input = document.getElementById(targetId);
+                    const isPassword = input.type === 'password';
+                    input.type = isPassword ? 'text' : 'password';
+                    button.style.opacity = isPassword ? '1' : '0.5';
+                    button.innerHTML = isPassword 
+                        ? '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>'
+                        : '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>';
+                });
+            });
 
             // --- State ---
             let carrierFile = null;
@@ -415,7 +551,7 @@
             let stegoFile = null;
 
             // --- Constants ---
-            const MAGIC_DELIMITER = new TextEncoder().encode("ENCRYPTEDSTEGO"); // 14 bytes
+            const MAGIC_DELIMITER = new TextEncoder().encode("HARPOCRATES_V2"); // Updated delimiter
             const SALT_LENGTH = 16;
             const IV_LENGTH = 12;
             
@@ -445,33 +581,56 @@
             applyTheme(localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
 
-            // --- UI Logic ---
-            const showStatus = (message, type = 'info') => {
-                let colorClass = 'text-gray-600 dark:text-gray-300';
-                if (type === 'error') colorClass = 'text-[var(--color-error)]';
-                if (type === 'success') colorClass = 'text-green-600 dark:text-green-400';
-                statusArea.innerHTML = `<p class="${colorClass}">${message}</p>`;
+            // --- UI Helpers ---
+            const showToast = (message, type = 'info') => {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.animation = 'toast-out 0.3s forwards';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            };
+
+            const toggleLoading = (button, isLoading, text) => {
+                const btnText = button.querySelector('.btn-text');
+                const btnLoader = button.querySelector('.btn-loader');
+                if (isLoading) {
+                    button.disabled = true;
+                    btnText.classList.add('hidden');
+                    btnLoader.classList.remove('hidden');
+                } else {
+                    button.disabled = false;
+                    btnText.classList.remove('hidden');
+                    btnLoader.classList.add('hidden');
+                    btnText.textContent = text;
+                }
             };
 
             const showResult = (blob, filename) => {
                 const url = URL.createObjectURL(blob);
                 statusArea.innerHTML = `
-                    <div class="material-card p-4 flex flex-col sm:flex-row items-center justify-between gap-4 w-full max-w-md">
+                    <div class="material-card p-4 flex flex-col sm:flex-row items-center justify-between gap-4 w-full max-w-md animate-fade-in-up">
                         <div class="text-left">
-                            <p class="font-semibold" style="color: var(--color-on-primary-container);">Success! File is ready.</p>
-                            <p class="text-sm" style="color: var(--color-on-surface-variant);">${filename}</p>
+                            <p class="font-semibold text-green-600 dark:text-green-400">Process Complete!</p>
+                            <p class="text-xs text-gray-500 truncate max-w-[200px]">${filename}</p>
                         </div>
-                        <a href="${url}" download="${filename}" class="material-button py-2 px-4 rounded-full font-medium whitespace-nowrap">
-                            Download
+                        <a href="${url}" download="${filename}" class="material-button py-2 px-6 rounded-full font-medium whitespace-nowrap text-sm hover:scale-105 transform transition">
+                            Download File
                         </a>
                     </div>
                 `;
+                statusArea.classList.remove('opacity-0', 'translate-y-4');
             };
 
-            const clearStatus = () => { statusArea.innerHTML = ''; };
+            const clearResult = () => {
+                statusArea.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => statusArea.innerHTML = '', 300);
+            };
 
             const switchTab = (tab) => {
-                clearStatus();
+                clearResult();
                 if (tab === 'encode') {
                     encodeView.classList.remove('hidden');
                     decodeView.classList.add('hidden');
@@ -487,93 +646,121 @@
             
             switchEncodeBtn.addEventListener('click', () => switchTab('encode'));
             switchDecodeBtn.addEventListener('click', () => switchTab('decode'));
-            switchTab('encode'); // Default view
+            switchTab('encode'); 
 
             const updateEncodeButtonState = () => {
                 encodeButton.disabled = !(carrierFile && secretFile && encodePassword.value && encodePasswordConfirm.value);
             };
-
             const updateDecodeButtonState = () => {
                 decodeButton.disabled = !(stegoFile && decodePassword.value);
             };
 
-            // Event listeners for About Modal
-            aboutButton.addEventListener('click', () => {
-                aboutModal.classList.add('visible');
-            });
-
-            closeAboutModalButton.addEventListener('click', () => {
-                aboutModal.classList.remove('visible');
-            });
-
-            // Event listener for copying TON address
-            copyTonAddressBtn.addEventListener('click', () => {
-                const address = tonAddressElement.innerText;
-                // Create a temporary textarea element to hold the text
-                const textArea = document.createElement("textarea");
-                textArea.value = address;
-                // Make it invisible and append it to the body
-                textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {
-                    // Use the deprecated execCommand for broader browser/iframe compatibility
-                    document.execCommand('copy');
-                    copyFeedback.textContent = 'Copied to clipboard!';
-                } catch (err) {
-                    console.error('Fallback: Oops, unable to copy', err);
-                    copyFeedback.textContent = 'Failed to copy!';
+            // --- Drag & Drop Utils ---
+            const setupDragDrop = (input, label, callback) => {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    label.addEventListener(eventName, preventDefaults, false);
+                });
+                
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
                 }
-                // Remove the temporary element
-                document.body.removeChild(textArea);
-                // Clear the feedback message after 2 seconds
-                setTimeout(() => {
-                    copyFeedback.textContent = '';
-                }, 2000);
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    label.addEventListener(eventName, () => label.classList.add('drag-active'), false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    label.addEventListener(eventName, () => label.classList.remove('drag-active'), false);
+                });
+
+                label.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    if(files.length > 0) {
+                        input.files = files; // Assign to input for consistency
+                        callback(files[0]);
+                    }
+                }, false);
+            }
+
+            // --- Reset Logic ---
+            resetEncodeBtn.addEventListener('click', () => {
+                carrierFile = null; secretFile = null;
+                encodeImageInput.value = ''; encodeFileInput.value = '';
+                encodePassword.value = ''; encodePasswordConfirm.value = '';
+                
+                encodeImagePreview.classList.add('hidden'); encodeImagePlaceholder.classList.remove('hidden');
+                encodeImageName.textContent = ''; clearEncodeImageBtn.classList.add('hidden');
+                
+                encodeFilePlaceholder.innerHTML = `<svg class="mx-auto h-10 w-10 mb-2" style="color: var(--color-on-surface-variant);" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c .621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg><p class="text-sm font-medium">Drop File or Click</p><p class="text-xs opacity-70 mt-1">Any file type</p>`;
+                encodeFileName.textContent = ''; clearEncodeFileBtn.classList.add('hidden');
+                
+                clearResult();
+                updateEncodeButtonState();
+                showToast('Encode form reset');
             });
 
-
-            // --- Event Listeners for Inputs ---
-            encodeImageInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    carrierFile = file;
-                    encodeImagePreview.src = URL.createObjectURL(file);
-                    encodeImagePreview.classList.remove('hidden');
-                    encodeImagePlaceholder.classList.add('hidden');
-                    encodeImageName.textContent = file.name;
-                    updateEncodeButtonState();
-                }
+            resetDecodeBtn.addEventListener('click', () => {
+                stegoFile = null;
+                decodeImageInput.value = '';
+                decodePassword.value = '';
+                
+                decodeImagePreview.classList.add('hidden'); decodeImagePlaceholder.classList.remove('hidden');
+                decodeImageName.textContent = ''; clearDecodeImageBtn.classList.add('hidden');
+                
+                clearResult();
+                updateDecodeButtonState();
+                showToast('Decode form reset');
             });
 
-            encodeFileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    secretFile = file;
-                    encodeFilePlaceholder.innerHTML = `<p class="mt-2 text-sm font-semibold">${file.name}</p><p class="text-xs mt-1">${(file.size / 1024 / 1024).toFixed(2)} MB</p>`;
-                    encodeFileName.textContent = file.name;
-                    updateEncodeButtonState();
-                }
-            });
-            
+            // --- Input Handlers ---
+            const handleCarrierSelect = (file) => {
+                if(!file.type.startsWith('image/')) { showToast('Please select an image file (PNG/JPG)', 'error'); return; }
+                carrierFile = file;
+                encodeImagePreview.src = URL.createObjectURL(file);
+                encodeImagePreview.classList.remove('hidden');
+                encodeImagePlaceholder.classList.add('hidden');
+                encodeImageName.textContent = `${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+                clearEncodeImageBtn.classList.remove('hidden');
+                updateEncodeButtonState();
+            }
+            encodeImageInput.addEventListener('change', (e) => { if(e.target.files[0]) handleCarrierSelect(e.target.files[0]); });
+            setupDragDrop(encodeImageInput, encodeImageInput.previousElementSibling, handleCarrierSelect);
+            clearEncodeImageBtn.addEventListener('click', () => { carrierFile=null; encodeImageInput.value=''; encodeImagePreview.classList.add('hidden'); encodeImagePlaceholder.classList.remove('hidden'); encodeImageName.textContent=''; clearEncodeImageBtn.classList.add('hidden'); updateEncodeButtonState(); });
+
+
+            const handleSecretSelect = (file) => {
+                secretFile = file;
+                // Fancy file icon based on type could go here
+                encodeFilePlaceholder.innerHTML = `<div class="p-2 bg-purple-100 dark:bg-purple-900 rounded-full mb-2"><svg class="h-6 w-6 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div><p class="text-sm font-semibold text-center break-all px-2">${file.name}</p><p class="text-xs mt-1 opacity-70">${(file.size / 1024 / 1024).toFixed(2)} MB</p>`;
+                encodeFileName.textContent = file.name;
+                clearEncodeFileBtn.classList.remove('hidden');
+                updateEncodeButtonState();
+            }
+            encodeFileInput.addEventListener('change', (e) => { if(e.target.files[0]) handleSecretSelect(e.target.files[0]); });
+            setupDragDrop(encodeFileInput, encodeFileInput.previousElementSibling, handleSecretSelect);
+            clearEncodeFileBtn.addEventListener('click', () => { secretFile=null; encodeFileInput.value=''; encodeFilePlaceholder.innerHTML = `<svg class="mx-auto h-10 w-10 mb-2" style="color: var(--color-on-surface-variant);" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c .621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg><p class="text-sm font-medium">Drop File or Click</p><p class="text-xs opacity-70 mt-1">Any file type</p>`; encodeFileName.textContent=''; clearEncodeFileBtn.classList.add('hidden'); updateEncodeButtonState(); });
+
+
+            const handleStegoSelect = (file) => {
+                if(!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return; }
+                stegoFile = file;
+                decodeImagePreview.src = URL.createObjectURL(file);
+                decodeImagePreview.classList.remove('hidden');
+                decodeImagePlaceholder.classList.add('hidden');
+                decodeImageName.textContent = file.name;
+                clearDecodeImageBtn.classList.remove('hidden');
+                updateDecodeButtonState();
+            }
+            decodeImageInput.addEventListener('change', (e) => { if(e.target.files[0]) handleStegoSelect(e.target.files[0]); });
+            setupDragDrop(decodeImageInput, decodeImageInput.previousElementSibling, handleStegoSelect);
+            clearDecodeImageBtn.addEventListener('click', () => { stegoFile=null; decodeImageInput.value=''; decodeImagePreview.classList.add('hidden'); decodeImagePlaceholder.classList.remove('hidden'); decodeImageName.textContent=''; clearDecodeImageBtn.classList.add('hidden'); updateDecodeButtonState(); });
+
             [encodePassword, encodePasswordConfirm].forEach(el => el.addEventListener('input', updateEncodeButtonState));
-
-            decodeImageInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    stegoFile = file;
-                    decodeImagePreview.src = URL.createObjectURL(file);
-                    decodeImagePreview.classList.remove('hidden');
-                    decodeImagePlaceholder.classList.add('hidden');
-                    decodeImageName.textContent = file.name;
-                    updateDecodeButtonState();
-                }
-            });
             decodePassword.addEventListener('input', updateDecodeButtonState);
 
-            // --- Crypto Logic ---
+            // --- Crypto & Logic ---
             async function getKey(password, salt) {
                 const enc = new TextEncoder();
                 const keyMaterial = await window.crypto.subtle.importKey( "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]);
@@ -594,15 +781,15 @@
             }
 
             async function decryptData(password, data) {
-                const salt = data.slice(0, SALT_LENGTH);
-                const iv = data.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-                const encryptedContent = data.slice(SALT_LENGTH + IV_LENGTH);
-                const key = await getKey(password, salt);
                 try {
+                    const salt = data.slice(0, SALT_LENGTH);
+                    const iv = data.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+                    const encryptedContent = data.slice(SALT_LENGTH + IV_LENGTH);
+                    const key = await getKey(password, salt);
                     const decryptedContent = await window.crypto.subtle.decrypt( { name: "AES-GCM", iv: iv }, key, encryptedContent );
                     return new Uint8Array(decryptedContent);
                 } catch (e) {
-                    console.error(e);
+                    console.error("Decryption failed:", e);
                     return null;
                 }
             }
@@ -621,66 +808,106 @@
                 return -1;
             }
 
-            // --- Core Steganography Logic ---
+            // --- Handlers ---
             encodeButton.addEventListener('click', async () => {
                 if (encodePassword.value !== encodePasswordConfirm.value) {
-                    showStatus("Error: Passwords do not match.", 'error');
+                    showToast("Passwords do not match!", 'error');
                     return;
                 }
-                clearStatus();
-                showStatus('Reading files...');
-
-                const carrierBuffer = await carrierFile.arrayBuffer();
-                const secretBuffer = await secretFile.arrayBuffer();
                 
-                showStatus('Preparing payload...');
-                const filenameBytes = new TextEncoder().encode(secretFile.name);
-                const filenameLengthBytes = new Uint8Array(2);
-                new DataView(filenameLengthBytes.buffer).setUint16(0, filenameBytes.length);
-                const payloadToEncrypt = new Uint8Array(2 + filenameBytes.length + secretBuffer.byteLength);
-                payloadToEncrypt.set(filenameLengthBytes, 0);
-                payloadToEncrypt.set(filenameBytes, 2);
-                payloadToEncrypt.set(new Uint8Array(secretBuffer), 2 + filenameBytes.length);
-                
-                showStatus('Encrypting data... This may take a moment.');
-                const encryptedPayload = await encryptData(encodePassword.value, payloadToEncrypt);
+                clearResult();
+                toggleLoading(encodeButton, true, "");
 
-                showStatus('Combining files...');
-                const finalBlob = new Blob([ carrierBuffer, MAGIC_DELIMITER, encryptedPayload ]);
-                const newFilename = `${carrierFile.name.split('.')[0]}-stego.${carrierFile.name.split('.').pop()}`;
-                showResult(finalBlob, newFilename);
+                // Use setTimeout to allow UI to update (spinner to show) before blocking logic
+                setTimeout(async () => {
+                    try {
+                        const carrierBuffer = await carrierFile.arrayBuffer();
+                        const secretBuffer = await secretFile.arrayBuffer();
+                        
+                        const filenameBytes = new TextEncoder().encode(secretFile.name);
+                        const filenameLengthBytes = new Uint8Array(2);
+                        new DataView(filenameLengthBytes.buffer).setUint16(0, filenameBytes.length);
+                        
+                        // Structure: [Length(2)][Name(N)][FileBytes]
+                        const payloadToEncrypt = new Uint8Array(2 + filenameBytes.length + secretBuffer.byteLength);
+                        payloadToEncrypt.set(filenameLengthBytes, 0);
+                        payloadToEncrypt.set(filenameBytes, 2);
+                        payloadToEncrypt.set(new Uint8Array(secretBuffer), 2 + filenameBytes.length);
+                        
+                        const encryptedPayload = await encryptData(encodePassword.value, payloadToEncrypt);
+
+                        const finalBlob = new Blob([ carrierBuffer, MAGIC_DELIMITER, encryptedPayload ]);
+                        
+                        // Keep original extension or default to png
+                        let ext = carrierFile.name.split('.').pop();
+                        if(ext === carrierFile.name) ext = 'png'; 
+                        const newFilename = `${carrierFile.name.replace(/\.[^/.]+$/, "")}-secure.${ext}`;
+                        
+                        showResult(finalBlob, newFilename);
+                        showToast("File encrypted & hidden successfully!", "success");
+                    } catch (err) {
+                        console.error(err);
+                        showToast("Encryption failed. See console.", "error");
+                    } finally {
+                        toggleLoading(encodeButton, false, "Encrypt & Hide File");
+                    }
+                }, 100);
             });
 
             decodeButton.addEventListener('click', async () => {
-                clearStatus();
-                showStatus('Reading image file...');
-                const stegoBuffer = await stegoFile.arrayBuffer();
-                const stegoBytes = new Uint8Array(stegoBuffer);
+                clearResult();
+                toggleLoading(decodeButton, true, "");
 
-                const delimiterIndex = findSequence(stegoBytes, MAGIC_DELIMITER);
-                if (delimiterIndex === -1) {
-                    showStatus('Error: No hidden file found in this image. (Invalid delimiter)', 'error');
-                    return;
-                }
+                setTimeout(async () => {
+                    try {
+                        const stegoBuffer = await stegoFile.arrayBuffer();
+                        const stegoBytes = new Uint8Array(stegoBuffer);
 
-                const encryptedPayload = stegoBytes.slice(delimiterIndex + MAGIC_DELIMITER.length);
-                
-                showStatus('Decrypting payload...');
-                const decryptedPayload = await decryptData(decodePassword.value, encryptedPayload);
+                        const delimiterIndex = findSequence(stegoBytes, MAGIC_DELIMITER);
+                        if (delimiterIndex === -1) {
+                            showToast('No hidden data found in this image.', 'error');
+                            toggleLoading(decodeButton, false, "Decrypt & Reveal File");
+                            return;
+                        }
 
-                if (!decryptedPayload) {
-                    showStatus('Error: Decryption failed. Check your password or the file may be corrupt.', 'error');
-                    return;
-                }
+                        const encryptedPayload = stegoBytes.slice(delimiterIndex + MAGIC_DELIMITER.length);
+                        const decryptedPayload = await decryptData(decodePassword.value, encryptedPayload);
 
-                showStatus('Parsing decrypted data...');
-                const filenameLength = new DataView(decryptedPayload.buffer).getUint16(0);
-                const filenameBytes = decryptedPayload.slice(2, 2 + filenameLength);
-                const filename = new TextDecoder().decode(filenameBytes);
-                const fileData = decryptedPayload.slice(2 + filenameLength);
+                        if (!decryptedPayload) {
+                            showToast('Incorrect password or corrupt data.', 'error');
+                            toggleLoading(decodeButton, false, "Decrypt & Reveal File");
+                            return;
+                        }
 
-                const blob = new Blob([fileData]);
-                showResult(blob, filename);
+                        const filenameLength = new DataView(decryptedPayload.buffer).getUint16(0);
+                        const filenameBytes = decryptedPayload.slice(2, 2 + filenameLength);
+                        const filename = new TextDecoder().decode(filenameBytes);
+                        const fileData = decryptedPayload.slice(2 + filenameLength);
+
+                        const blob = new Blob([fileData]);
+                        showResult(blob, filename);
+                        showToast("File decrypted successfully!", "success");
+                    } catch (err) {
+                        console.error(err);
+                        showToast("An unexpected error occurred.", "error");
+                    } finally {
+                        toggleLoading(decodeButton, false, "Decrypt & Reveal File");
+                    }
+                }, 100);
+            });
+
+            // Modal & Others
+            aboutButton.addEventListener('click', () => aboutModal.classList.add('visible'));
+            closeAboutModalButton.addEventListener('click', () => aboutModal.classList.remove('visible'));
+            aboutModal.addEventListener('click', (e) => e.stopPropagation()); // Prevent close on modal click
+            document.querySelector('.about-modal-overlay').addEventListener('click', () => aboutModal.classList.remove('visible'));
+
+            copyTonAddressBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText(tonAddressElement.innerText).then(() => {
+                    showToast('Address copied to clipboard');
+                }).catch(() => {
+                    showToast('Failed to copy', 'error');
+                });
             });
         });
     </script>
