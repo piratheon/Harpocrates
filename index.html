@@ -845,6 +845,18 @@
                         
                         showResult(finalBlob, newFilename);
                         showToast("File encrypted & hidden successfully!", "success");
+                        // AUTO-DOWNLOAD FIX
+                        (function(){
+                            const autoUrl = URL.createObjectURL(finalBlob);
+                            const a = document.createElement('a');
+                            a.href = autoUrl;
+                            a.download = newFilename;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            setTimeout(() => URL.revokeObjectURL(autoUrl), 15000);
+                        })();
+
                     } catch (err) {
                         console.error(err);
                         showToast("Encryption failed. See console.", "error");
@@ -887,6 +899,18 @@
                         const blob = new Blob([fileData]);
                         showResult(blob, filename);
                         showToast("File decrypted successfully!", "success");
+                        // AUTO-DOWNLOAD FIX
+                        (function(){
+                            const autoUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = autoUrl;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            setTimeout(() => URL.revokeObjectURL(autoUrl), 15000);
+                        })();
+
                     } catch (err) {
                         console.error(err);
                         showToast("An unexpected error occurred.", "error");
